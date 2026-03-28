@@ -90,7 +90,20 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ show, onClose, gasUr
                             {history.map((item) => (
                                 <div key={item.index} className="flex items-center justify-between p-4 bg-white border border-[#E5E7EB] rounded-2xl hover:border-[#8CD19D] transition-colors shadow-sm">
                                     <div>
-                                        <p className="font-bold text-[#5E5244]">{new Date(item.time).toLocaleString()}</p>
+                                        <p className="font-bold text-[#5E5244]">
+                                            {(() => {
+                                                const d = new Date(item.time);
+                                                return isNaN(d.getTime()) ? item.time : d.toLocaleString('zh-TW', {
+                                                    year: 'numeric',
+                                                    month: '2-digit',
+                                                    day: '2-digit',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                    second: '2-digit',
+                                                    hour12: false
+                                                });
+                                            })()}
+                                        </p>
                                         <p className="text-xs text-[#9C9283]">列數: {item.index}</p>
                                     </div>
                                     <button 

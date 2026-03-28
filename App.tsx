@@ -107,32 +107,45 @@ function doPost(e) {
     var action = postData.action;
 
     // --- 自動遷移舊版資料 ---
-    var firstCell = sheet.getRange(1, 1).getValue();
-    if (typeof firstCell === 'string' && firstCell.indexOf('{"') === 0) {
-      var oldData = firstCell;
+    var headerA = sheet.getRange(1, 1).getValue();
+    var headerB = sheet.getRange(1, 2).getValue();
+    
+    // 判斷是否為舊版 (B1 是 'Data'，或者 A1 根本不是 'Timestamp')
+    if (headerB === 'Data' || headerA !== 'Timestamp') {
+      var lastRow = sheet.getLastRow();
+      var oldJson = null;
+      
+      // 嘗試找出舊資料 (通常在最後一列的 B 欄或 A 欄)
+      if (lastRow >= 1) {
+        var possibleDataB = sheet.getRange(lastRow, 2).getValue();
+        var possibleDataA = sheet.getRange(lastRow, 1).getValue();
+        if (typeof possibleDataB === 'string' && possibleDataB.indexOf('{"') === 0) {
+          oldJson = possibleDataB;
+        } else if (typeof possibleDataA === 'string' && possibleDataA.indexOf('{"') === 0) {
+          oldJson = possibleDataA;
+        }
+      }
+      
+      // 清除並重建標題
       sheet.clear();
       sheet.appendRow(['Timestamp', 'Grades', 'UserData', 'Library', 'LibraryCategories', 'Settings', 'TargetDate']);
       sheet.setFrozenRows(1);
-      try {
-        var d = JSON.parse(oldData);
-        sheet.appendRow([
-          new Date(),
-          JSON.stringify(d.grades || []),
-          JSON.stringify(d.userData || {}),
-          JSON.stringify(d.library || []),
-          JSON.stringify(d.libraryCategories || []),
-          JSON.stringify(d.settings || {}),
-          d.targetDate || ""
-        ]);
-      } catch(err) {}
-    } else if (sheet.getLastRow() === 0 || sheet.getRange(1, 1).getValue() !== 'Timestamp') {
-      if (sheet.getLastRow() === 0) {
-        sheet.appendRow(['Timestamp', 'Grades', 'UserData', 'Library', 'LibraryCategories', 'Settings', 'TargetDate']);
-      } else {
-        sheet.insertRowBefore(1);
-        sheet.getRange(1, 1, 1, 7).setValues([['Timestamp', 'Grades', 'UserData', 'Library', 'LibraryCategories', 'Settings', 'TargetDate']]);
+      
+      // 寫入舊資料
+      if (oldJson) {
+        try {
+          var d = JSON.parse(oldJson);
+          sheet.appendRow([
+            new Date(),
+            JSON.stringify(d.grades || []),
+            JSON.stringify(d.userData || {}),
+            JSON.stringify(d.library || []),
+            JSON.stringify(d.libraryCategories || []),
+            JSON.stringify(d.settings || {}),
+            d.targetDate || ""
+          ]);
+        } catch(err) {}
       }
-      sheet.setFrozenRows(1);
     }
     // ------------------------
 
@@ -179,8 +192,17 @@ function doPost(e) {
     } else if (action == 'history') {
       var lastRow = sheet.getLastRow();
       if (lastRow < 2) return ContentService.createTextOutput(JSON.stringify({'status': 'success', 'history': []})).setMimeType(ContentService.MimeType.JSON);
-      var timestamps = sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues().map(function(r, i) { 
-        return { index: i + 2, time: r[0] || ("舊紀錄 " + (i+2)) }; 
+      var timestamps = sheet.getRange(2, 1, lastRow - 1, 1).getValues().map(function(r, i) { 
+        var t = r[0];
+        var timeStr = "";
+        if (t instanceof Date) {
+          timeStr = t.toISOString();
+        } else if (t) {
+          timeStr = t.toString();
+        } else {
+          timeStr = "舊紀錄 " + (i+2);
+        }
+        return { index: i + 2, time: timeStr }; 
       }).reverse().slice(0, 20);
       return ContentService.createTextOutput(JSON.stringify({'status': 'success', 'history': timestamps})).setMimeType(ContentService.MimeType.JSON);
     } else if (action == 'load_history') {
